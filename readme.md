@@ -1,6 +1,8 @@
-# Million Playlist Dataset Challenge Analysis
+# mpd-PlaylistSimilarity-unal
 
-Este repositorio contiene el pipeline para analizar el **challenge set** (10.000 playlists parciales) del Million Playlist Dataset (MPD) de Spotify, con el fin de extraer atributos musicales (géneros, popularidad, mood, etc.) y generar estadísticas por playlist.
+Este repositorio contiene un pipeline de minería de datos el cuál se desarrolló como proyecto para la materia Minería de Datos de la UNAL-Sede Bogotá , enfocado en analizar el **challenge set** (10.000 playlists parciales) del Million Playlist Dataset (MPD) de Spotify y medir la **similitud** entre playlists. Utiliza atributos musicales (géneros, popularidad, danceability, energy, valence, tempo, etc.) y técnicas de clustering y similitud para descubrir patrones y agrupar playlists con gustos afines.
+
+---  
 
 ---
 
