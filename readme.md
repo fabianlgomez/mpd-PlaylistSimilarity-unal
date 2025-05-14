@@ -43,6 +43,7 @@ Este repositorio contiene el pipeline para analizar el **challenge set** (10.000
    ```env
    SPOTIPY_CLIENT_ID=tu_client_id
    SPOTIPY_CLIENT_SECRET=tu_client_secret
+   LASTFM_API_KEY=tu_lastfm_api_key         # si usas Last.fm
    ```
 
 ---
@@ -71,10 +72,21 @@ Este repositorio contiene el pipeline para analizar el **challenge set** (10.000
 ## 🔗 Recursos
 
 - [Million Playlist Dataset (MPD) ](https://www.kaggle.com/datasets/himanshuwagh/spotify-million)
-- (https://www.aicrowd.com/challenges/spotify-million-playlist-dataset-challenge)
+- [RecSys Challenge 2018 en AIcrowd](https://www.aicrowd.com/challenges/spotify-million-playlist-dataset-challenge)
 - [Spotipy – Python library for Spotify Web API](https://spotipy.readthedocs.io/)
 
 ---
+## 📌 API de Spotify y de terceros
+
+**Deprecación de Audio Features & Audio Analysis (27 Nov 2024):**  
+Spotify anunció el 27 de noviembre de 2024 que los endpoints **Get Several Tracks' Audio Features** y **Get Track's Audio Analysis** han sido **deprecados para nuevas aplicaciones**. Solo las aplicaciones que contaban con **acceso extendido** antes de esa fecha pueden seguir utilizándolos.  
+*Más info: [https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api)*
+
+**Por ello el pipeline también integra:**
+
+- **Last.fm API**: para obtener géneros y etiquetas comunitarias (tags).
+- **AcousticBrainz API**: para extraer atributos **low-level** (danceability, energy, loudness, tempo…) y **high-level** (moods: happy, sad, party, acoustic…) de forma gratuita y abierta.
+
 
 ## ⚖️ Licencia
 
