@@ -10,8 +10,8 @@ para extraer únicamente los campos requeridos:
   - AcousticBrainz high-level: top genre, danceability, mood_happy, acousticness
 Respetando el rate limit de MusicBrainz (1 req/s por IP),
 paraleliza llamadas a AcousticBrainz (8 hilos),
-logea progreso, guarda al detectar interrupción o fallo,
-y reanuda desde el JSON parcial.
+logea progreso, admite timeouts y Ctrl+C inmediato,
+guarda progreso al fallo y reanuda desde el JSON parcial.
 """
 
 import os
@@ -20,7 +20,7 @@ import time
 import json
 from math import ceil
 from dotenv import load_dotenv
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 import requests
 import musicbrainzngs
@@ -90,21 +90,21 @@ def get_mb_info(track_name, artist_name):
         genre = tags_sorted[0].get("name") if tags_sorted else None
         rating = rec.get("rating", {})
         return mbid, genre, rating.get("value"), rating.get("votes-count")
-    except:
+    except Exception:
         return None, None, None, None
 
 def fetch_acousticbrainz(mbid):
     """
-    Obtiene low-level y high-level de AcousticBrainz para un MBID dado.
+    Obtiene low-level y high-level de AcousticBrainz para un MBID dado, con timeout.
     """
     base = "https://acousticbrainz.org"
     try:
-        ll = AB_SESSION.get(f"{base}/{mbid}/low-level", timeout=10)
-        ll.raise_for_status()
-        hl = AB_SESSION.get(f"{base}/{mbid}/high-level", timeout=10)
-        hl.raise_for_status()
-        return ll.json(), hl.json()
-    except:
+        ll_resp = AB_SESSION.get(f"{base}/{mbid}/low-level", timeout=5)
+        ll_resp.raise_for_status()
+        hl_resp = AB_SESSION.get(f"{base}/{mbid}/high-level", timeout=5)
+        hl_resp.raise_for_status()
+        return ll_resp.json(), hl_resp.json()
+    except Exception:
         return {}, {}
 
 def select_top_genre(highlevel):
@@ -162,7 +162,7 @@ batches    = ceil(len(remaining) / batch_size)
 start_time = time.time()
 
 # ------------------------------------------------------------
-# 7) Procesar cada batch
+# 7) Procesar cada batch con timeouts y Ctrl+C inmediato
 # ------------------------------------------------------------
 try:
     for b in range(batches):
@@ -172,9 +172,9 @@ try:
 
         for i, tid in enumerate(batch, start=start+1):
             elapsed = time.time() - start_time
-            print(f" ▶ [{i}/{total}] {tid} – {elapsed:.1f}s")
+            print(f" ▶ [{i}/{total}] {tid} – {elapsed:.1f}s elapsed")
 
-            meta   = sp_meta.get(tid, {})
+            meta   = sp_meta.get(tid,{})
             name   = meta.get("track_name","")
             artist = meta.get("artist_name","")
 
@@ -186,7 +186,11 @@ try:
 
             if mbid:
                 future = acoustic_executor.submit(fetch_acousticbrainz, mbid)
-                ll, hl = future.result()
+                try:
+                    ll, hl = future.result(timeout=5)
+                except TimeoutError:
+                    print("   ⚠️  Timeout AcousticBrainz, salto pista")
+                    ll, hl = {}, {}
                 bpm            = ll.get("rhythm",{}).get("bpm")
                 energy         = ll.get("lowlevel",{}).get("dynamic_complexity")
                 dance_ll       = ll.get("rhythm",{}).get("danceability")
@@ -211,13 +215,14 @@ try:
                 "rating_votes":    rating_cnt
             }
 
+        # guardado tras cada batch
         with open(data_file,"w",encoding="utf-8") as fout:
             json.dump(abz_data,fout,indent=2,ensure_ascii=False)
         print(f"✅ Guardado '{data_file}' tras batch {b+1}\n")
-        time.sleep(0.1)  # descansa entre batches
+        time.sleep(0.1)
 
 except KeyboardInterrupt:
-    print("\n⏸️ Interrumpido. Guardando…")
+    print("\n⏸️ Interrumpido por usuario. Guardando…")
     with open(data_file,"w",encoding="utf-8") as fout:
         json.dump(abz_data,fout,indent=2,ensure_ascii=False)
     sys.exit(0)
