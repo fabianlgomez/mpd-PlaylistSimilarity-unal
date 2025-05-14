@@ -3,11 +3,14 @@
 enrich_challenge_set_acousticbrainz.py
 
 Lee spotify_metadata.json (fase 1 ya ejecutada),
-luego consulta AcousticBrainz para extraer low-level y high-level,
-logea progress por canción y batch, muestra tiempo transcurrido,
-guarda progreso inmediato al detectar KeyboardInterrupt o cualquier fallo,
-y reanuda ejecuciones posteriores desde el JSON parcial.
-Ahora también guarda el ISRC y el MBID usados en cada entrada.
+luego consulta MusicBrainz y AcousticBrainz para enriquecer cada track:
+  - Primero intenta resolver MBID por ISRC, si falla por título+artista
+  - Con MBID pide en MusicBrainz tags y ratings
+  - Con MBID pide en AcousticBrainz low-level y high-level
+Logea progress, guarda progreso inmediato al detectar interrupción o fallo,
+reanuda ejecuciones posteriores desde el JSON parcial.
+Ahora guarda también el ISRC, el MBID, los tags y ratings de MusicBrainz,
+y los datos de AcousticBrainz.
 """
 
 import os
@@ -36,11 +39,11 @@ creds = SpotifyClientCredentials(client_id=SPOTI_ID,
                                  client_secret=SPOTI_SECRET)
 sp    = spotipy.Spotify(client_credentials_manager=creds)
 
-# MusicBrainz para resolver MBID vía ISRC
+# MusicBrainz (resolver MBID y obtener tags/ratings)
 musicbrainzngs.set_useragent("enrichAB", "1.0", "tu_email@dominio.com")
 
 # ------------------------------------------------------------
-# 2) Funciones AcousticBrainz
+# 2) Funciones para MBID, MusicBrainz y AcousticBrainz
 # ------------------------------------------------------------
 def get_mbid_from_isrc(isrc):
     try:
@@ -48,6 +51,29 @@ def get_mbid_from_isrc(isrc):
         return recs[0]["id"] if recs else None
     except Exception:
         return None
+
+def get_mbid_from_name(track_name, artist_name):
+    try:
+        result = musicbrainzngs.search_recordings(recording=track_name,
+                                                  artist=artist_name,
+                                                  limit=1)
+        recs = result.get("recording-list", [])
+        return recs[0]["id"] if recs else None
+    except Exception:
+        return None
+
+def fetch_mb_tags_and_ratings(mbid):
+    """
+    Retorna (tags_list, rating_value, rating_count)
+    """
+    try:
+        rec = musicbrainzngs.get_recording_by_id(mbid, includes=["tags","rating"])
+        recording = rec.get("recording", {})
+        tags = [t["name"] for t in recording.get("tag-list", [])]
+        rating = recording.get("rating", {})
+        return tags, rating.get("value"), rating.get("votes")
+    except Exception:
+        return [], None, None
 
 def fetch_acousticbrainz(mbid):
     base = "https://acousticbrainz.org"
@@ -103,20 +129,21 @@ batches    = ceil(len(remaining) / batch_size)
 start_time = time.time()
 
 # ------------------------------------------------------------
-# 5) Fase AcousticBrainz con logging y guardado inmediato
+# 5) Fase AcousticBrainz + MusicBrainz tags/ratings
 # ------------------------------------------------------------
 try:
     for b in range(batches):
         b_start = b * batch_size
         batch   = remaining[b_start : b_start + batch_size]
-        print(f"[AB] Batch {b+1}/{batches}: tracks {b_start+1}–{b_start+len(batch)}")
+        print(f"[AB] Batch {b+1}/{batches}: pistas {b_start+1}–{b_start+len(batch)}")
 
         for idx, tid in enumerate(batch, start=b_start+1):
             elapsed = time.time() - start_time
             print(f"    ▶ [{idx}/{total}] ID={tid} – {elapsed:.1f}s elapsed")
 
-            # 1) ISRC (fallback si no existe en sp_meta)
-            isrc = sp_meta.get(tid, {}).get("isrc")
+            meta = sp_meta.get(tid, {})
+            # 1) Intentar con ISRC
+            isrc = meta.get("isrc")
             if not isrc:
                 try:
                     rec = sp.track(tid)
@@ -124,20 +151,31 @@ try:
                 except Exception:
                     isrc = None
 
-            # 2) MBID
+            # 2) Resolver MBID
             mbid = get_mbid_from_isrc(isrc) if isrc else None
+            if not mbid:
+                mbid = get_mbid_from_name(meta.get("track_name",""),
+                                          meta.get("artist_name",""))
 
-            # 3) AcousticBrainz
+            # 3) Obtener tags y ratings de MusicBrainz
+            mb_tags, mb_rating, mb_rating_count = ([], None, None)
+            if mbid:
+                mb_tags, mb_rating, mb_rating_count = fetch_mb_tags_and_ratings(mbid)
+
+            # 4) AcousticBrainz
             ll, hl = (None, None)
             if mbid:
                 ll, hl = fetch_acousticbrainz(mbid)
 
-            # Guardar también isrc y mbid
+            # Guardar datos completos
             abz_data[tid] = {
-                "isrc":       isrc,
-                "mbid":       mbid,
-                "low_level":  ll,
-                "high_level": hl
+                "isrc":           isrc,
+                "mbid":           mbid,
+                "mb_tags":        mb_tags,
+                "mb_rating":      mb_rating,
+                "mb_rating_count":mb_rating_count,
+                "low_level":      ll,
+                "high_level":     hl
             }
 
         # guardado intermedio tras cada batch
@@ -147,17 +185,17 @@ try:
         time.sleep(0.1)
 
 except KeyboardInterrupt:
-    print(f"\n⏸️  Interrumpido por usuario. Guardando progreso en '{data_file}'…")
+    print(f"\n⏸️  Interrumpido por usuario. Guardando '{data_file}'…")
     with open(data_file, "w", encoding="utf-8") as fout:
         json.dump(abz_data, fout, indent=2, ensure_ascii=False)
     print("✅ Progreso guardado. Reanuda ejecuciones posteriores.")
     sys.exit(0)
 
 except Exception as e:
-    print(f"\n❌ Error inesperado: {e}\nGuardando progreso en '{data_file}'…")
+    print(f"\n❌ Error inesperado: {e}\nGuardando '{data_file}'…")
     with open(data_file, "w", encoding="utf-8") as fout:
         json.dump(abz_data, fout, indent=2, ensure_ascii=False)
     sys.exit(1)
 
 total_elapsed = time.time() - start_time
-print(f"\n✅ Fase AcousticBrainz completada en {total_elapsed/60:.1f} min.")
+print(f"\n✅ Fase completada en {total_elapsed/60:.1f} min.")
