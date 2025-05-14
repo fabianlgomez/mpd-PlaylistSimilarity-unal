@@ -7,6 +7,7 @@ luego consulta AcousticBrainz para extraer low-level y high-level,
 logea progress por canción y batch, muestra tiempo transcurrido,
 guarda progreso inmediato al detectar KeyboardInterrupt o cualquier fallo,
 y reanuda ejecuciones posteriores desde el JSON parcial.
+Ahora también guarda el ISRC y el MBID usados en cada entrada.
 """
 
 import os
@@ -62,7 +63,7 @@ def fetch_acousticbrainz(mbid):
 # ------------------------------------------------------------
 # 3) Carga challenge_set y spotify_metadata
 # ------------------------------------------------------------
-with open("challenge_set.json", "r") as f:
+with open("challenge_set.json", "r", encoding="utf-8") as f:
     challenge = json.load(f)
 playlists = challenge["playlists"]
 
@@ -131,7 +132,13 @@ try:
             if mbid:
                 ll, hl = fetch_acousticbrainz(mbid)
 
-            abz_data[tid] = {"mbid": mbid, "low_level": ll, "high_level": hl}
+            # Guardar también isrc y mbid
+            abz_data[tid] = {
+                "isrc":       isrc,
+                "mbid":       mbid,
+                "low_level":  ll,
+                "high_level": hl
+            }
 
         # guardado intermedio tras cada batch
         with open(data_file, "w", encoding="utf-8") as fout:
