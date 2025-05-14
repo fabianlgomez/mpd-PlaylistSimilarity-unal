@@ -4,3 +4,6 @@ test.txt
 __pycache__/
 .cache
 challenge_set.json
+spotify_metadata.json
+enriched_challenge_set.json
+lastfm_tags.json
