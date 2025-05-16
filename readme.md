@@ -56,18 +56,7 @@ Este repositorio contiene un pipeline de minería de datos el cuál se desarroll
    ```bash
    python src/extract_metadata.py --input challenge_set.json --output tracks_metadata.csv
    ```
-
-2. **Abrir el Jupyter Notebook**
-   ```bash
-   jupyter lab
-   ```
-   - Abre `notebooks/analysis.ipynb` y ejecuta todas las celdas.
-
-3. **Generar estadísticas por playlist**
-   - El notebook produce `playlist_stats.csv` con columnas:
-     - `pid`: ID de la playlist
-     - `predominant_genre`
-     - `avg_popularity`, `avg_valence`, `avg_energy`, etc.
+ON PROGRESS...
 
 ---
 
