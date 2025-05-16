@@ -76,7 +76,9 @@ Este repositorio contiene un pipeline de minería de datos el cuál se desarroll
 - [Million Playlist Dataset (MPD) ](https://www.kaggle.com/datasets/himanshuwagh/spotify-million)
 - [RecSys Challenge 2018 en AIcrowd](https://www.aicrowd.com/challenges/spotify-million-playlist-dataset-challenge)
 - [Spotipy – Python library for Spotify Web API](https://spotipy.readthedocs.io/)
-
+- [AcousticBrainz API](https://acousticbrainz.org/data)
+- [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API)
+- [Last.FM API](https://www.last.fm/api)
 ---
 ## 📌 API de Spotify y de terceros
 
