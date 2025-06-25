@@ -16,6 +16,7 @@ Este repositorio contiene un pipeline de minería de datos el cuál se desarroll
 - **pip**
 - **virtualenv** (incluido en la librería estándar `venv`)
 - Claves de API de Spotify (Client ID y Client Secret)
+- Claves de API de AcousticBrainz
 
 ---
 
